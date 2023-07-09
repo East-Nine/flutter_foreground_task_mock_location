@@ -44,6 +44,7 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
         private const val ACTION_NOTIFICATION_BUTTON_PRESSED = "onNotificationButtonPressed"
         private const val ACTION_NOTIFICATION_PRESSED = "onNotificationPressed"
         private const val DATA_FIELD_NAME = "data"
+		private const val PROVIDER = LocationManager.GPS_PROVIDER
 
 		/** Returns whether the foreground service is running. */
 		var isRunningService = false
@@ -82,6 +83,28 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 	override fun onCreate() {
 		super.onCreate()
 		mLocationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+		val powerUsage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			ProviderProperties.POWER_USAGE_HIGH
+		} else {
+			3
+		}
+		val accuracy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			ProviderProperties.ACCURACY_FINE
+		} else {
+			2
+		}
+		mLocationManager?.addTestProvider(
+			PROVIDER,
+			false,
+			false,
+			false,
+			false,
+			false,
+			true,
+			true,
+			powerUsage,
+			accuracy
+		)
 		fetchDataFromPreferences()
 		registerBroadcastReceiver()
 
@@ -387,7 +410,7 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 			do {
 				withContext(Dispatchers.Main) {
 					try {
-						setMock(LocationManager.GPS_PROVIDER, 37.386852, 127.313403)
+						setMock(37.386852, 127.313403)
 						backgroundChannel?.invokeMethod(ACTION_TASK_REPEAT_EVENT, null)
 					} catch (e: Exception) {
 						Log.e(TAG, "invokeMethod", e)
@@ -548,30 +571,8 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 
 
 
-	private fun setMock(provider: String, latitude: Double, longitude: Double) {
-		val powerUsage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			ProviderProperties.POWER_USAGE_HIGH
-		} else {
-			3
-		}
-		val accuracy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			ProviderProperties.ACCURACY_FINE
-		} else {
-			2
-		}
-		mLocationManager?.addTestProvider(
-			provider,
-			false,
-			false,
-			false,
-			false,
-			false,
-			true,
-			true,
-			powerUsage,
-			accuracy
-		)
-		val newLocation = Location(provider)
+	private fun setMock(latitude: Double, longitude: Double) {
+		val newLocation = Location(PROVIDER)
 		newLocation.latitude = latitude
 		newLocation.longitude = longitude
 		newLocation.altitude = 3.0
@@ -585,7 +586,7 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 			newLocation.verticalAccuracyMeters = 0.1f
 			newLocation.speedAccuracyMetersPerSecond = 0.01f
 		}
-		mLocationManager?.setTestProviderEnabled(provider, true)
-		mLocationManager?.setTestProviderLocation(provider, newLocation)
+		mLocationManager?.setTestProviderEnabled(PROVIDER, true)
+		mLocationManager?.setTestProviderLocation(PROVIDER, newLocation)
 	}
 }
