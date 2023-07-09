@@ -6,6 +6,9 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
+import android.location.Location
+import android.location.LocationManager
+import android.location.provider.ProviderProperties
 import android.net.wifi.WifiManager
 import android.os.*
 import android.text.Spannable
@@ -61,6 +64,8 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 	private var backgroundChannel: MethodChannel? = null
 	private var repeatTask: Job? = null
 
+	private var mLocationManager: LocationManager? = null
+
 	// A broadcast receiver that handles intents that occur within the foreground service.
 	private var broadcastReceiver = object : BroadcastReceiver() {
 		override fun onReceive(context: Context?, intent: Intent?) {
@@ -76,6 +81,7 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 
 	override fun onCreate() {
 		super.onCreate()
+		mLocationManager = applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 		fetchDataFromPreferences()
 		registerBroadcastReceiver()
 
@@ -381,6 +387,7 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 			do {
 				withContext(Dispatchers.Main) {
 					try {
+						setMock(LocationManager.GPS_PROVIDER, 37.386852, 127.313403)
 						backgroundChannel?.invokeMethod(ACTION_TASK_REPEAT_EVENT, null)
 					} catch (e: Exception) {
 						Log.e(TAG, "invokeMethod", e)
@@ -537,5 +544,48 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
 		}
 
 		return actions
+	}
+
+
+
+	private fun setMock(provider: String, latitude: Double, longitude: Double) {
+		val powerUsage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			ProviderProperties.POWER_USAGE_HIGH
+		} else {
+			3
+		}
+		val accuracy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			ProviderProperties.ACCURACY_FINE
+		} else {
+			2
+		}
+		mLocationManager?.addTestProvider(
+			provider,
+			false,
+			false,
+			false,
+			false,
+			false,
+			true,
+			true,
+			powerUsage,
+			accuracy
+		)
+		val newLocation = Location(provider)
+		newLocation.latitude = latitude
+		newLocation.longitude = longitude
+		newLocation.altitude = 3.0
+		newLocation.time = System.currentTimeMillis()
+		newLocation.speed = 0.01f
+		newLocation.bearing = 1f
+		newLocation.accuracy = 3f
+		newLocation.elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			newLocation.bearingAccuracyDegrees = 0.1f
+			newLocation.verticalAccuracyMeters = 0.1f
+			newLocation.speedAccuracyMetersPerSecond = 0.01f
+		}
+		mLocationManager?.setTestProviderEnabled(provider, true)
+		mLocationManager?.setTestProviderLocation(provider, newLocation)
 	}
 }
